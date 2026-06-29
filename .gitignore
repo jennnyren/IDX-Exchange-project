@@ -1,0 +1,9 @@
+rets_openhouse.sql
+rets_property.sql
+
+.env
+backend/.env
+
+node_modules/
+
+.DS_Store
