@@ -96,8 +96,8 @@ router.get("/", async (req, res) => {
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-    // Pagination
-    const pageLimit = Number(limit) || 20;
+    // Pagination (limit capped at 100 to bound response size)
+    const pageLimit = Math.min(Number(limit) || 20, 100);
     const pageOffset = Number(offset) || 0;
 
     // Count query
