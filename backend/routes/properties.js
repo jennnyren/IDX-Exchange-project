@@ -120,4 +120,51 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/properties/:id/openhouses  — MUST come before /:id
+router.get("/:id/openhouses", async (req, res) => {
+  const { id } = req.params;
+
+  // Validate the listing id (adjust if your IDs aren't integers)
+  if (!id || id.trim() === "") {
+    return res.status(400).json({ error: "id is required" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM rets_openhouse
+       WHERE L_ListingID = ?
+       ORDER BY OpenHouseDate, OH_StartTime`,
+      [id],
+    );
+    // Empty array is a valid, successful response — NOT a 404
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/properties/:id  — single property or 404
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id || id.trim() === "") {
+    return res.status(400).json({ error: "id is required" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM rets_property WHERE L_ListingID = ?`,
+      [id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: `No property found with id ${id}` });
+    }
+    res.json(rows[0]); // one object, not an array
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;
