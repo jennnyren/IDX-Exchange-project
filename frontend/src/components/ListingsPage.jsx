@@ -1,33 +1,52 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fetchProperties } from "../api/properties";
 import PropertyCard from "./PropertyCard";
+import PropertyFilters from "./PropertyFilters";
 
 export default function ListingsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const runSearch = useCallback((filters = {}) => {
     setLoading(true);
-    fetchProperties({ limit: 20, offset: 0 })
+    setError(null);
+    fetchProperties({ limit: 20, offset: 0, ...filters })
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Loading properties...</p>;
-  if (error) return <p className="error">Couldn't load properties: {error}</p>;
+  useEffect(() => {
+    runSearch();
+  }, [runSearch]);
 
   return (
     <div>
-      <p className="count">
-        Showing {data.results.length} of {data.total} properties
-      </p>
-      <div className="grid">
-        {data.results.map((property) => (
-          <PropertyCard key={property.L_ListingID} property={property} />
+      <PropertyFilters onSearch={runSearch} onClear={() => runSearch()} />
+
+      {loading && <p>Loading properties...</p>}
+      {error && <p className="error">Couldn't load properties: {error}</p>}
+
+      {!loading &&
+        !error &&
+        data &&
+        (data.results.length === 0 ? (
+          <p className="no-results">
+            No properties match your filters. Try widening your search.
+          </p>
+        ) : (
+          <>
+            <p className="count">
+              Showing {data.results.length} of {data.total} properties
+            </p>
+            <div className="grid">
+              {data.results.map((property) => (
+                <PropertyCard key={property.L_ListingID} property={property} />
+              ))}
+            </div>
+          </>
         ))}
-      </div>
     </div>
   );
 }
