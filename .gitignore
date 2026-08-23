@@ -3,6 +3,7 @@ rets_property.sql
 
 .env
 backend/.env
+frontend/.env
 
 node_modules/
 

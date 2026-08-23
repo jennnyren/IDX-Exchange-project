@@ -1,23 +1,13 @@
-function parsePhotos(photosJson) {
-  try {
-    const photos = JSON.parse(photosJson);
-    return Array.isArray(photos) ? photos : [];
-  } catch {
-    return [];
-  }
-}
+import { Link } from "react-router-dom";
+import { parsePhotos } from "../utils/photos";
+import PropertyImageCarousel from "./PropertyImageCarousel";
 
 export default function PropertyCard({ property }) {
   const photos = parsePhotos(property.L_Photos);
-  const firstPhoto = photos[0];
 
   return (
-    <div className="property-card">
-      {firstPhoto ? (
-        <img src={firstPhoto} alt={property.L_Address} />
-      ) : (
-        <div className="property-card-noimage">No photo</div>
-      )}
+    <Link to={`/property/${property.L_ListingID}`} className="property-card">
+      <PropertyImageCarousel photos={photos} alt={property.L_Address} />
       <div className="property-card-body">
         <p className="price">
           ${Number(property.L_SystemPrice).toLocaleString()}
@@ -31,6 +21,6 @@ export default function PropertyCard({ property }) {
           {Number(property.LM_Int2_3).toLocaleString()} sqft
         </p>
       </div>
-    </div>
+    </Link>
   );
 }
