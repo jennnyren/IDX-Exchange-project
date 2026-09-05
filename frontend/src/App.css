@@ -248,6 +248,14 @@
   color: #b00020;
 }
 
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+}
+
 .pagination {
   display: flex;
   align-items: center;
