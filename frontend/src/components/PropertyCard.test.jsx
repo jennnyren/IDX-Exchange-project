@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 
 const property = {
@@ -27,9 +27,75 @@ async function renderCard() {
   );
 }
 
+// Renders the card inside a router that also has the detail route mounted, so
+// clicking through can be asserted on the destination that actually renders.
+async function renderCardWithDetailRoute() {
+  const { default: PropertyCard } = await import("./PropertyCard");
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <Routes>
+        <Route path="/" element={<PropertyCard property={property} />} />
+        <Route
+          path="/property/:id"
+          element={<h2>Detail page for 123</h2>}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   window.localStorage.clear();
   vi.resetModules();
+});
+
+describe("PropertyCard rendering", () => {
+  it("formats the price with thousands separators", async () => {
+    await renderCard();
+
+    expect(screen.getByText("$300,000")).toBeInTheDocument();
+  });
+
+  it("renders the address and city/state", async () => {
+    await renderCard();
+
+    expect(screen.getByText("1 Main St")).toBeInTheDocument();
+    expect(screen.getByText("Boston, MA")).toBeInTheDocument();
+  });
+
+  it("renders beds, baths, and square footage", async () => {
+    await renderCard();
+
+    expect(screen.getByText("3 bd | 2 ba | 1,500 sqft")).toBeInTheDocument();
+  });
+
+  it("links to the detail route for the listing id", async () => {
+    await renderCard();
+
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/property/123");
+  });
+});
+
+describe("PropertyCard navigation", () => {
+  it("navigates to the detail page when the card is clicked", async () => {
+    const user = userEvent.setup();
+    await renderCardWithDetailRoute();
+
+    expect(screen.queryByText("Detail page for 123")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link"));
+
+    expect(screen.getByText("Detail page for 123")).toBeInTheDocument();
+  });
+
+  it("does not navigate when the favorite button is clicked", async () => {
+    const user = userEvent.setup();
+    await renderCardWithDetailRoute();
+
+    await user.click(screen.getByRole("button", { name: "Add to favorites" }));
+
+    expect(screen.queryByText("Detail page for 123")).not.toBeInTheDocument();
+  });
 });
 
 describe("PropertyCard favorite button", () => {
