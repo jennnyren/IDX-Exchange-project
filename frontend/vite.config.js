@@ -16,5 +16,22 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: "./src/test-setup.js",
+    coverage: {
+      provider: "v8",
+      // Only application code is measured; entry points (main.jsx) and the
+      // test setup would otherwise dilute the component numbers.
+      include: [
+        "src/components/**/*.jsx",
+        "src/hooks/**/*.js",
+        "src/api/**/*.js",
+        "src/utils/**/*.js",
+      ],
+      thresholds: {
+        lines: 70,
+        statements: 70,
+        branches: 70,
+        functions: 70,
+      },
+    },
   },
 });
