@@ -171,13 +171,26 @@ router.get("/:id/openhouses", async (req, res) => {
   }
 
   try {
+    // Two distinct "no open houses" cases have to be told apart: a listing
+    // that exists but has none scheduled (200 with []) versus a listing id
+    // that isn't in rets_property at all (404). Querying rets_openhouse
+    // alone can't distinguish them — both return zero rows — so the
+    // property's existence is checked first.
+    const [propertyRows] = await pool.query(
+      `SELECT L_ListingID FROM rets_property WHERE L_ListingID = ?`,
+      [id],
+    );
+    if (propertyRows.length === 0) {
+      return res.status(404).json({ error: `No property found with id ${id}` });
+    }
+
     const [rows] = await pool.query(
       `SELECT * FROM rets_openhouse
        WHERE L_ListingID = ?
        ORDER BY OpenHouseDate, OH_StartTime`,
       [id],
     );
-    // Empty array is a valid, successful response — NOT a 404
+    // The property exists, so an empty array is a valid 200 — not a 404.
     res.json(rows);
   } catch (err) {
     console.error(err);
