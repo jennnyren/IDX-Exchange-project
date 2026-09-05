@@ -16,10 +16,21 @@ export async function fetchProperties({
   maxPrice,
   beds,
   baths,
+  sortBy,
+  sortOrder,
 } = {}) {
   const params = new URLSearchParams({ limit, offset });
 
-  const optional = { city, zipcode, minPrice, maxPrice, beds, baths };
+  const optional = {
+    city,
+    zipcode,
+    minPrice,
+    maxPrice,
+    beds,
+    baths,
+    sortBy,
+    sortOrder,
+  };
   for (const [key, value] of Object.entries(optional)) {
     if (value !== undefined && value !== null && value !== "") {
       params.set(key, value);

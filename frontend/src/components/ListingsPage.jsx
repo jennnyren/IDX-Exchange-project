@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { fetchProperties } from "../api/properties";
 import PropertyCard from "./PropertyCard";
 import PropertyFilters from "./PropertyFilters";
+import SortControls from "./SortControls";
 import Pagination from "./Pagination";
 
 const ITEMS_PER_PAGE = 20;
@@ -11,29 +12,42 @@ export default function ListingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
+  const [sort, setSort] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
 
-  const runSearch = useCallback((activeFilters, page) => {
+  const runSearch = useCallback((activeFilters, activeSort, page) => {
     setLoading(true);
     setError(null);
     const offset = (page - 1) * ITEMS_PER_PAGE;
-    fetchProperties({ limit: ITEMS_PER_PAGE, offset, ...activeFilters })
+    fetchProperties({
+      limit: ITEMS_PER_PAGE,
+      offset,
+      ...activeFilters,
+      ...activeSort,
+    })
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    runSearch(filters, currentPage);
-  }, [runSearch, filters, currentPage]);
+    runSearch(filters, sort, currentPage);
+  }, [runSearch, filters, sort, currentPage]);
 
   function handleSearch(newFilters) {
     setFilters(newFilters);
+    setSort({});
     setCurrentPage(1);
   }
 
   function handleClear() {
     setFilters({});
+    setSort({});
+    setCurrentPage(1);
+  }
+
+  function handleSortChange(newSort) {
+    setSort(newSort);
     setCurrentPage(1);
   }
 
@@ -49,6 +63,7 @@ export default function ListingsPage() {
   return (
     <div>
       <PropertyFilters onSearch={handleSearch} onClear={handleClear} />
+      <SortControls value={sort} onChange={handleSortChange} />
 
       {loading && <p>Loading properties...</p>}
       {error && <p className="error">Couldn't load properties: {error}</p>}
