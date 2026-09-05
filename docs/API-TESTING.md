@@ -59,6 +59,15 @@ curl -s "http://localhost:8080/api/properties/1118422731/openhouses" | jq .
 curl -s -i "http://localhost:8080/api/properties/%20/openhouses"
 ```
 
+**B7 — unknown property → 404 (not an empty array)**
+
+The endpoint distinguishes "this listing exists but has nothing scheduled" (B5, a
+`200` with `[]`) from "this listing id doesn't exist at all", which is a `404`.
+
+```bash
+curl -s -i "http://localhost:8080/api/properties/9999999999/openhouses"
+```
+
 ## C. Route order (`/openhouses` must win over `/:id`)
 
 **C7 — must return an ARRAY (the open houses), not a single property object**
