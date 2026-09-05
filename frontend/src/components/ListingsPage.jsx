@@ -18,6 +18,8 @@ export default function ListingsPage() {
   const runSearch = useCallback((activeFilters, activeSort, page) => {
     setLoading(true);
     setError(null);
+    // The API pages by row offset, the UI by 1-based page number: page 1 is
+    // offset 0, page 2 is offset 20, and so on.
     const offset = (page - 1) * ITEMS_PER_PAGE;
     fetchProperties({
       limit: ITEMS_PER_PAGE,
@@ -56,6 +58,11 @@ export default function ListingsPage() {
     window.scrollTo({ top: 0 });
   }
 
+  // Counters for the "Showing 21-40 of 45" line. These are derived from the
+  // offset the *server* echoed back rather than from currentPage, so the label
+  // can never disagree with the rows actually on screen while a fetch is in
+  // flight. endItem uses results.length instead of offset + ITEMS_PER_PAGE so
+  // a short final page reads "41-45", not "41-60".
   const totalPages = data ? Math.ceil(data.total / ITEMS_PER_PAGE) : 0;
   const startItem = data ? data.offset + 1 : 0;
   const endItem = data ? data.offset + data.results.length : 0;

@@ -99,7 +99,16 @@ router.get("/", async (req, res) => {
 
   // city, zipcode: strings, no validation needed, passed as-is to the parameterized query
 
-  // Build the filtered WHERE clause dynamically
+  // Build the WHERE clause dynamically. Two arrays are kept in lockstep: one
+  // of SQL fragments joined with AND, one of the values bound to their `?`
+  // placeholders. Only fragments are ever concatenated into the SQL string —
+  // user input goes exclusively into `params`, so the query stays
+  // parameterized no matter which combination of filters is supplied.
+  //
+  // Note the truthiness checks: an absent filter and an empty-string filter
+  // (`?city=`) both mean "don't filter", so neither adds a clause. Values are
+  // compared with LOWER(TRIM(...)) on both sides because the RETS feed has
+  // inconsistent casing and stray whitespace in L_City and L_Zip.
   try {
     const where = [];
     const params = [];
