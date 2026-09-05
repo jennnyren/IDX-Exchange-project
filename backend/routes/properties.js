@@ -2,9 +2,29 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+// Whitelist mapping public sort keys to actual rets_property columns.
+// sortBy must always be resolved through this map — never interpolated
+// directly into SQL — since column names can't use `?` placeholders.
+const SORT_COLUMNS = {
+  price: "L_SystemPrice",
+  dateListed: "OnMarketDate",
+  sqft: "LM_Int2_3",
+  beds: "L_Keyword2",
+};
+
 router.get("/", async (req, res) => {
-  const { minPrice, maxPrice, beds, baths, limit, offset, city, zipcode } =
-    req.query;
+  const {
+    minPrice,
+    maxPrice,
+    beds,
+    baths,
+    limit,
+    offset,
+    city,
+    zipcode,
+    sortBy,
+    sortOrder,
+  } = req.query;
 
   // Validate numeric fields (decimals allowed)
   if (
@@ -62,6 +82,21 @@ router.get("/", async (req, res) => {
       .json({ error: "offset must be a non-negative integer" });
   }
 
+  if (sortBy !== undefined && !Object.hasOwn(SORT_COLUMNS, sortBy)) {
+    return res.status(400).json({
+      error: `sortBy must be one of: ${Object.keys(SORT_COLUMNS).join(", ")}`,
+    });
+  }
+
+  if (
+    sortOrder !== undefined &&
+    !["asc", "desc"].includes(String(sortOrder).toLowerCase())
+  ) {
+    return res
+      .status(400)
+      .json({ error: "sortOrder must be 'asc' or 'desc'" });
+  }
+
   // city, zipcode: strings, no validation needed, passed as-is to the parameterized query
 
   // Build the filtered WHERE clause dynamically
@@ -96,6 +131,12 @@ router.get("/", async (req, res) => {
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
+    // ORDER BY column always comes from the SORT_COLUMNS whitelist, not the
+    // raw query string, since column names can't be passed as `?` params.
+    const orderClause = sortBy
+      ? `ORDER BY ${SORT_COLUMNS[sortBy]} ${String(sortOrder || "asc").toUpperCase()}`
+      : "";
+
     // Pagination (limit capped at 100 to bound response size)
     const pageLimit = Math.min(Number(limit) || 20, 100);
     const pageOffset = Number(offset) || 0;
@@ -109,7 +150,7 @@ router.get("/", async (req, res) => {
 
     // Page query
     const [results] = await pool.query(
-      `SELECT * FROM rets_property ${whereClause} LIMIT ? OFFSET ?`,
+      `SELECT * FROM rets_property ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
       [...params, pageLimit, pageOffset],
     );
 
