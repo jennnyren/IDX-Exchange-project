@@ -1,68 +1,180 @@
-# ===== A. GET /:id (single property) =====
+# Property Search Application
 
-# A1 known id -> 200, a single JSON object
+A full-stack property search app built on an IDX/RETS MLS dataset: an Express + MySQL
+JSON API and a React (Vite) frontend for browsing, filtering, sorting, and saving
+listings.
 
-curl "http://localhost:8080/api/properties/1077426281"
-curl -s "http://localhost:8080/api/properties/1077426281" | jq '{L_ListingID, L_City, L_SystemPrice}'
+## Features
 
-# A2 unknown id -> 404 + JSON error message
+- **Listings grid** with server-side pagination (20 per page, capped at 100).
+- **Filtering** by city, ZIP, price range, beds, and baths.
+- **Sorting** by price, date listed, square footage, or beds — preserved across pages.
+- **Property detail pages** with an image gallery, lightbox, open-house schedule, and a map.
+- **Favorites** persisted to `localStorage` and shared across the app via a subscribable store.
+- **Error boundary** that catches render errors per route instead of blanking the page.
 
-curl -s -i "http://localhost:8080/api/properties/9999999999"
-curl -s "http://localhost:8080/api/properties/9999999999" | jq .
+## Tech stack
 
-# A3 blank id -> 400
+| Layer    | Stack                                                          |
+| -------- | -------------------------------------------------------------- |
+| Backend  | Node.js, Express 5, mysql2 (connection pool), dotenv, cors      |
+| Frontend | React 19, React Router 7, Vite 7                               |
+| Testing  | Vitest, React Testing Library, jest-dom, oxlint                 |
+| Database | MySQL 8.4 (`rets_property`, `rets_openhouse`)                   |
 
-curl -s -i "http://localhost:8080/api/properties/%20"
+## Project structure
 
-# ===== B. GET /:id/openhouses =====
+```
+backend/
+  server.js                # Express app, /api/health, route mounting
+  db.js                    # mysql2 connection pool
+  middleware/
+    requestLogger.js       # logs method, URL, status, duration
+  routes/
+    properties.js          # all /api/properties endpoints
+frontend/
+  src/
+    api/properties.js      # fetch wrappers for the API
+    components/            # ListingsPage, PropertyCard, SortControls, ...
+    hooks/useFavorites.js  # localStorage-backed favorites store
+    utils/photos.js        # parses the L_Photos JSON column
+docs/
+  PERFORMANCE.md           # EXPLAIN analysis and indexing findings
+  API-TESTING.md           # manual curl verification steps
+rets_property.sql          # schema dumps (stale on indexes — see PERFORMANCE.md)
+rets_openhouse.sql
+```
 
-# B4 property WITH an open house -> 200, array of length 1
+## Getting started
 
-curl "http://localhost:8080/api/properties/1077426281/openhouses"
-curl -s "http://localhost:8080/api/properties/1077426281/openhouses" | jq 'length'
+### Prerequisites
 
-# B5 valid property, NO open houses -> 200, empty array [] (not 404)
+- Node.js 20+
+- A local MySQL 8.4 instance with the `rets` database loaded
 
-curl "http://localhost:8080/api/properties/1118422731/openhouses"
-curl -s "http://localhost:8080/api/properties/1118422731/openhouses" | jq .
+### 1. Database
 
-# B6 blank id -> 400
+Import the dumps into a `rets` database. These docs assume MySQL running in a Docker
+container named `idx-mysql-local`:
 
-curl -s -i "http://localhost:8080/api/properties/%20/openhouses"
+```bash
+docker exec -i idx-mysql-local mysql -u root -p rets < rets_property.sql
+docker exec -i idx-mysql-local mysql -u root -p rets < rets_openhouse.sql
+```
 
-# ===== C. Route order (openhouses must win over /:id) =====
+`rets_property` holds ~28k listings. Note that the checked-in dumps do **not** reflect
+the live table's indexes — see [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
-# C7 must return an ARRAY (the open houses), not a single property object
+### 2. Backend
 
-curl -s "http://localhost:8080/api/properties/1077426281/openhouses" | jq 'type'
+Create `backend/.env` (git-ignored):
 
-# expect: "array" (if you see "object", /:id is swallowing the route)
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your-password
+DB_NAME=rets
+PORT=8080
+```
 
-# ===== D. Request logging middleware =====
+```bash
+cd backend
+npm install
+npm run dev          # nodemon on http://localhost:8080
+```
 
-# No curl to assert this — run any request above, then LOOK at the terminal
+Verify: `curl http://localhost:8080/api/health` → `{"status":"ok","database":"connected"}`
 
-# running `npm run dev`. You should see a line like:
+### 3. Frontend
 
-# GET /api/properties/1077426281 200 3.4ms
+Create `frontend/.env` (git-ignored) if you want maps on the detail page:
 
-# Confirm it shows: method + URL + status code + duration(ms).
+```
+VITE_GOOGLE_MAPS_API_KEY=your-key
+```
 
-# ===== E. Ordering (needs 2 seeded open houses, then cleanup) =====
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:3000
+```
 
-# E1 seed two extra open houses for 1077426281 (earlier dates/times)
+Vite proxies `/api` to `http://localhost:8080`, so both servers must be running.
 
-docker exec idx-mysql-local mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "INSERT INTO rets_openhouse (L_ListingID,L_DisplayId,OpenHouseDate,OH_StartTime,OH_EndTime,OH_StartDate,OH_EndDate,all_data,updated_date) VALUES ('1077426281','TEST','2026-06-16','08:00:00','10:00:00','2026-06-16','2026-06-16','{}',NOW()),('1077426281','TEST','2026-06-15','12:00:00','14:00:00','2026-06-15','2026-06-15','{}',NOW());" rets
+## Testing
 
-# E2 fetch -> should be ordered: 2026-06-15 12:00, 2026-06-16 08:00, 2026-06-16 09:00
+```bash
+cd frontend
+npm test             # vitest run
+npm run lint         # oxlint
+```
 
-curl -s "http://localhost:8080/api/properties/1077426281/openhouses" | jq '[.[] | {OpenHouseDate, OH_StartTime}]'
+The backend has no automated tests; endpoints are verified manually via
+[docs/API-TESTING.md](docs/API-TESTING.md).
 
-# E3 CLEAN UP (restores your data exactly — always run this)
+## API reference
 
-docker exec idx-mysql-local mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "DELETE FROM rets_openhouse WHERE L_ListingID='1077426281' AND L_DisplayId='TEST';" rets
-The IDs are real, pulled from your DB:
+Base URL: `http://localhost:8080/api`
 
-1077426281 — exists, has 1 open house
-1118422731 — exists, has no open houses (tests the empty [])
-9999999999 — not in the table (tests 404)
+### `GET /properties`
+
+Returns a paginated, filtered, optionally sorted page of listings.
+
+| Param       | Type    | Notes                                                        |
+| ----------- | ------- | ------------------------------------------------------------ |
+| `city`      | string  | Exact match on `L_City`                                       |
+| `zipcode`   | string  | Exact match on `L_Zip`                                        |
+| `minPrice`  | number  | Decimals allowed                                              |
+| `maxPrice`  | number  | Decimals allowed                                              |
+| `beds`      | number  | Minimum beds                                                  |
+| `baths`     | number  | Minimum baths                                                 |
+| `sortBy`    | enum    | `price`, `dateListed`, `sqft`, `beds`                         |
+| `sortOrder` | enum    | `asc` (default) or `desc`                                     |
+| `limit`     | integer | Default 20, capped at 100                                     |
+| `offset`    | integer | Default 0                                                     |
+
+```json
+{ "total": 28251, "limit": 20, "offset": 0, "results": [ /* ... */ ] }
+```
+
+Invalid numeric params, an unknown `sortBy`, or a `sortOrder` other than `asc`/`desc`
+return `400` with an `{ "error": "..." }` body. `sortBy` is resolved through a
+column whitelist — column names can't be passed as prepared-statement placeholders,
+so the raw query string never reaches the SQL.
+
+### `GET /properties/:id`
+
+One property object, or `404` if the listing id doesn't exist.
+
+### `GET /properties/:id/openhouses`
+
+Array of open houses for the listing, ordered by date then start time. An empty
+array is a successful `200` — not a `404`.
+
+## Data notes
+
+`rets_property` uses raw RETS column names. The ones this app reads:
+
+| Column           | Meaning         |
+| ---------------- | --------------- |
+| `L_ListingID`    | Listing id (PK) |
+| `L_SystemPrice`  | Price           |
+| `L_Address`      | Street address  |
+| `L_City`         | City            |
+| `L_State`        | State           |
+| `L_Zip`          | ZIP code        |
+| `L_Keyword2`     | Beds            |
+| `LM_Dec_3`       | Baths           |
+| `LM_Int2_3`      | Square footage  |
+| `L_Photos`       | JSON array of photo URLs |
+| `OnMarketDate`   | Date listed     |
+
+mysql2 returns `DECIMAL` columns (price, baths) as **strings** and `INT` columns as
+numbers, so numeric fields should be coerced before formatting or comparison.
+
+## Contributing
+
+Commit messages follow `type(scope): short description`, where type is one of
+`feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Pull requests use the template in
+[.github/pull_request_template.md](.github/pull_request_template.md).
