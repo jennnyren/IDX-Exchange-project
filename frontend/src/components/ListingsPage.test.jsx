@@ -106,4 +106,54 @@ describe("ListingsPage pagination", () => {
       expect.objectContaining({ offset: 0, city: "Cambridge" }),
     );
   });
+
+  it("preserves the active sort when changing pages", async () => {
+    const user = userEvent.setup();
+    fetchProperties.mockImplementation(respondWith(45));
+    renderListingsPage();
+
+    await screen.findByText("Showing 1-20 of 45 properties");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Sort properties" }),
+      "Price: Low to High",
+    );
+    await screen.findByText("Showing 1-20 of 45 properties");
+    expect(fetchProperties).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sortBy: "price", sortOrder: "asc" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    await screen.findByText("Showing 21-40 of 45 properties");
+    expect(fetchProperties).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 20, sortBy: "price", sortOrder: "asc" }),
+    );
+  });
+
+  it("resets the sort when new filters are applied", async () => {
+    const user = userEvent.setup();
+    fetchProperties.mockImplementation(respondWith(45));
+    renderListingsPage();
+
+    await screen.findByText("Showing 1-20 of 45 properties");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Sort properties" }),
+      "Price: Low to High",
+    );
+    await screen.findByText("Showing 1-20 of 45 properties");
+
+    await user.type(screen.getByPlaceholderText("City"), "Cambridge");
+    await user.click(screen.getByRole("button", { name: "Search" }));
+
+    await screen.findByText("Showing 1-20 of 45 properties");
+    const lastCallArgs = fetchProperties.mock.calls.at(-1)[0];
+    expect(lastCallArgs).toMatchObject({ city: "Cambridge" });
+    expect(lastCallArgs.sortBy).toBeUndefined();
+    expect(lastCallArgs.sortOrder).toBeUndefined();
+    expect(
+      screen.getByRole("combobox", { name: "Sort properties" }),
+    ).toHaveValue("");
+  });
 });
