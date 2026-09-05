@@ -1,12 +1,30 @@
 import { Link } from "react-router-dom";
 import { parsePhotos } from "../utils/photos";
+import { useFavorites } from "../hooks/useFavorites";
 import PropertyImageCarousel from "./PropertyImageCarousel";
 
 export default function PropertyCard({ property }) {
   const photos = parsePhotos(property.L_Photos);
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const favorited = isFavorite(property.L_ListingID);
+
+  function handleFavoriteClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite(property);
+  }
 
   return (
     <Link to={`/property/${property.L_ListingID}`} className="property-card">
+      <button
+        type="button"
+        className="favorite-button"
+        aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={favorited}
+        onClick={handleFavoriteClick}
+      >
+        {favorited ? "♥" : "♡"}
+      </button>
       <PropertyImageCarousel photos={photos} alt={property.L_Address} />
       <div className="property-card-body">
         <p className="price">
